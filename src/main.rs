@@ -21,6 +21,9 @@ fn main() -> ! {
     let tick_rate = Duration::from_micros(INTERVAL_US);
 
     let window: f32 = 30.0;
+    // PT3 Filter parameters
+    let cutoff_hz: f32 = 15.0; // Hz
+    let sample_rate_hz: f32 = 1000.0; // Hz
 
     let mut adc1_config = AdcConfig::new();
 
@@ -35,10 +38,30 @@ fn main() -> ! {
 
     let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
 
-    let mut throttle_axis = AutoCalibAxis::new(pin_throttle, window);
-    let mut yaw_axis = AutoCalibAxis::new(pin_yaw, window);
-    let mut pitch_axis = AutoCalibAxis::new(pin_pitch, window);
-    let mut roll_axis = AutoCalibAxis::new(pin_roll, window);
+    let mut throttle_axis = AutoCalibAxis::new(
+        pin_throttle,
+        window,
+        cutoff_hz,
+        sample_rate_hz,
+    );
+    let mut yaw_axis = AutoCalibAxis::new(
+        pin_yaw,
+        window,
+        cutoff_hz,
+        sample_rate_hz,
+    );
+    let mut pitch_axis = AutoCalibAxis::new(
+        pin_pitch,
+        window,
+        cutoff_hz,
+        sample_rate_hz,
+    );
+    let mut roll_axis = AutoCalibAxis::new(
+        pin_roll,
+        window,
+        cutoff_hz,
+        sample_rate_hz,
+    );
 
     let mut next_tick = Instant::now();
 

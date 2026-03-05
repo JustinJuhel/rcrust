@@ -7,15 +7,22 @@ impl<PIN: AdcChannel> AutoCalibAxis<PIN> {
     /// Read the analog pin multiple times and average them.
     /// The goal is to overcome the sensor jitter.
     pub(super) fn read_oversample(&mut self, adc: &mut Adc<'static, ADC1<'static>, Blocking>) -> u16 {
-        let sample = 16;
-        let mut summed_raw = 0;
+        // throw the first value away to avoid leftover charge in the microcontroller
+        let _trash = self.read(adc);
+
+        let basis = 6;
+
+        // let sample = 64;
+        let sample = 1 << basis; // 2^basis
+        let mut summed_raw: u32 = 0;
         let mut cnt = 0;
         while cnt < sample {
-            summed_raw += self.read(adc);
+            summed_raw += self.read(adc) as u32;
             cnt += 1;
         }
-        // bit shift by 4 is much faster than division by 16
-        summed_raw >> 4
+        // bit shift by 6 is much faster than division by 64
+        // summed_raw >> 6
+        (summed_raw >> basis) as u16
     }
 
     /// EMA (exponential moving average) filter. Computationally cheap. Smoothes out sensor jitter.
