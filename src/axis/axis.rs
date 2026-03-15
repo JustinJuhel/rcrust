@@ -1,4 +1,8 @@
-use esp_hal::{Blocking, analog::adc::{Adc, AdcChannel, AdcPin}, peripherals::{ADC1}};
+use esp_hal::{
+    Blocking,
+    analog::adc::{Adc, AdcChannel, AdcPin},
+    peripherals::ADC1,
+};
 
 use crate::axis::filtering::Pt3Filter;
 
@@ -13,11 +17,16 @@ pub struct AutoCalibAxis<PIN> {
 }
 
 impl<PIN: AdcChannel> AutoCalibAxis<PIN> {
-    pub fn new(pin: AdcPin<PIN, ADC1<'static>>, window: f32, cutoff_hz: f32, sample_rate_hz: f32) -> Self {
+    pub fn new(
+        pin: AdcPin<PIN, ADC1<'static>>,
+        window: f32,
+        cutoff_hz: f32,
+        sample_rate_hz: f32,
+    ) -> Self {
         Self {
             pin,
             min: 4095,
-            max: 0 ,
+            max: 0,
             last_filtered: None,
             alpha: 2.0 / (window + 1.0),
             pt3_filter: Pt3Filter::new(cutoff_hz, sample_rate_hz),
@@ -33,9 +42,11 @@ impl<PIN: AdcChannel> AutoCalibAxis<PIN> {
 
     /// raw data processing pipeline
     pub fn process(&mut self, adc: &mut Adc<'static, ADC1<'static>, Blocking>) -> u16 {
-        let raw = self.read_oversample(adc);
+        let mut raw = self.read_oversample(adc, 6);
+        // let mut raw = self.read(adc);
         // self.exponential_moving_average(raw)
-        self.pt3_filter.update(raw)
+        raw = self.pt3_filter.update(raw);
+        raw
     }
 
     /// warning: this normalization is not robust to potentiometer hysteresis

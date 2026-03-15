@@ -1,0 +1,39 @@
+/// Safer than using a `Vec<u16>` because here I know I won't confuse axes.
+pub struct RawAxes {
+    throttle: u16,
+    yaw: u16,
+    pitch: u16,
+    roll: u16,
+}
+
+impl RawAxes {
+    /// TODO: documentation
+    pub fn new(throttle: u16, yaw: u16, pitch: u16, roll: u16) -> RawAxes {
+        Self {
+            throttle,
+            yaw,
+            pitch,
+            roll,
+        }
+    }
+
+    /// TODO: documentation
+    pub fn throttle(&self) -> u16 {
+        self.throttle
+    }
+
+    /// TODO: documentation
+    pub fn yaw(&self) -> u16 {
+        self.yaw
+    }
+
+    /// TODO: documentation
+    pub fn pitch(&self) -> u16 {
+        self.pitch
+    }
+
+    /// TODO: documentation
+    pub fn roll(&self) -> u16 {
+        self.roll
+    }
+}
