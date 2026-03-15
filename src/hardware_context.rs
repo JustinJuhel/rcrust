@@ -9,7 +9,7 @@ use esp_hal::{
 };
 
 use crate::{
-    axis::{axis::AutoCalibAxis, raw_axes::RawAxes},
+    axis::{axis::AutoCalibAxis, calibration::RcCalibration, raw_axes::RawAxes},
     system_state::{FlyingMode, SystemState},
 };
 
@@ -21,6 +21,7 @@ pub struct HardwareContext {
     adc1: Adc<'static, ADC1<'static>, Blocking>,
     switch_calib: Input<'static>,
     switch_fly_mode: Input<'static>,
+    pub calibration: Option<RcCalibration>,
 }
 
 impl HardwareContext {
@@ -56,6 +57,8 @@ impl HardwareContext {
             adc1: Adc::new(peripherals.ADC1, adc1_config),
             switch_calib: Input::new(io_calib, InputConfig::default().with_pull(Pull::Down)),
             switch_fly_mode: Input::new(io_fly_mode, InputConfig::default().with_pull(Pull::Down)),
+            // TODO: try to get calibration here and replace the None
+            calibration: None,
         }
     }
 
@@ -70,11 +73,20 @@ impl HardwareContext {
     }
 
     /// TODO: doc
+    pub fn raw_axes(&mut self) -> RawAxes {
+        // temporary implementation
+        // we would need to use a specific algorithm configuration to feed the most natural jitter-free signal
+        self.axes(FlyingMode::Angle)
+    }
+
+    /// TODO: doc
     pub fn update_system_state(&mut self, system_state: &mut SystemState) -> SystemState {
         match system_state {
             // update ground mode
             SystemState::StandBy | SystemState::Calibration => {
                 *system_state = if self.switch_calib.is_high() {
+                    // reset calibration when switching to calibration mode
+                    self.calibration = None;
                     SystemState::Calibration
                 } else {
                     SystemState::StandBy
