@@ -74,8 +74,12 @@ impl RcCalibration {
         }
     }
 
-    /// TODO: impl & doc
+    /// # Throttle Dead Zone
+    /// The throttle is considered being all the way down when the received signal
+    /// is in the 10% lowest values. So the dead zone is the threshold of the 10%
+    /// lowest values.
     pub fn throttle_dead_zone(&self) -> u16 {
-        0
+        let throttle = self.throttle;
+        throttle.min + 0.1 * (throtthe.max - throttle.min) as u16
     }
 }

@@ -1,4 +1,5 @@
 /// Safer than using a `Vec<u16>` because here I know I won't confuse axes.
+#[derive(Clone, Copy)]
 pub struct RawAxes {
     throttle: u16,
     yaw: u16,

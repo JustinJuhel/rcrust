@@ -66,28 +66,15 @@ impl SystemState {
     /// the system goes to `Flying` mode and the drone reacts to joystick movements.
     ///
     /// In this mode, if there is no calibration, the drone won't fly. The user needs to calibrate the RC before flying.
-    pub fn tick_standby(context: &mut HardwareContext) {
-        println!("IN STANDBY MODE");
-        // the system starts in this mode. The user can start flying without doing a calibration.
-        // But the system needs to remember the conclusion of the last calibration.
-        // So we need to store the calibration results from the last calibration.
-        //
-        // If there is no calibration, must not be able to fly.
-        //
-        // Use the context.calibration
-
+    pub fn tick_standby(&mut self, context: &mut HardwareContext) {
         if context.calibration.is_none() {
             if let Some(calib_memory) = Self::get_calib_memory() {
                 context.calibration = Some(calib_memory.clone());
-                // if throttle is down
-                // this is sub-optimal because we read all axes just to get the throttle.
-                // TODO: implement a read function for each axis.
-                if context.raw_axes().throttle() <= calib_memory.throttle_dead_zone() {
-                    // TODO: transition to Flying mode
+                if context.raw_throttle() <= calib_memory.throttle_dead_zone() { // if throttle is down
+                    *self = SystemState::Flying(FlyingMode::Angle); // transition to Flying mode
                 }
-            } else {
-                // do nothing
-                println!("WARN: you need to calibrate the RC first!");
+            } else { // do nothing
+                println!("WARN: you need to calibrate the RC before flying!");
                 return;
             }
         }
@@ -98,7 +85,17 @@ impl SystemState {
         // For now we don't care about the flying_mode
         // We just println! the four axes
 
-        let axes = context.axes(flying_mode);
+        // TODO: is it very logical that the "hardware" context possesses the axes?
+        // This function implies signal processing which is not hardware but software.
+
+        // here, get raw values (minimum processing)
+        let axes = context.raw_axes();
+
+        // apply right processing algorithms
+        let axes = match flying_mode {
+            FlyingMode::Acro => axes.something(),
+            FlyingMode::Angle => axes.something_else(),
+        }
 
         println!(
             "{:.2}, {:.2}, {:.2}, {:.2}",
