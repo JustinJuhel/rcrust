@@ -1,15 +1,15 @@
 /// Safer than using a `Vec<u16>` because here I know I won't confuse axes.
 #[derive(Clone, Copy)]
-pub struct RawAxes {
+pub struct Axes {
     throttle: u16,
     yaw: u16,
     pitch: u16,
     roll: u16,
 }
 
-impl RawAxes {
+impl Axes {
     /// TODO: documentation
-    pub fn new(throttle: u16, yaw: u16, pitch: u16, roll: u16) -> RawAxes {
+    pub fn new(throttle: u16, yaw: u16, pitch: u16, roll: u16) -> Axes {
         Self {
             throttle,
             yaw,

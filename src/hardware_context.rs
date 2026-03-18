@@ -9,9 +9,13 @@ use esp_hal::{
     gpio::{AnyPin, Input, InputConfig, Pull},
     peripherals::{ADC1, GPIO32, GPIO33, GPIO34, GPIO35},
 };
+use esp_println::println;
 
 use crate::{
-    axis::{axis::AutoCalibAxis, calibration::RcCalibration, raw_axes::RawAxes},
+    axes::Axes,
+    calibration::RcCalibration,
+    filter::Filter,
+    radio::Radio,
     system_state::{FlyingMode, SystemState},
 };
 
@@ -24,10 +28,11 @@ pub struct HardwareContext {
     pin_yaw: AdcPin<GPIO33<'static>, ADC1<'static>>,
     pin_pitch: AdcPin<GPIO34<'static>, ADC1<'static>>,
     pin_roll: AdcPin<GPIO35<'static>, ADC1<'static>>,
-    raw_axes: RawAxes,
+    raw_axes: Axes,
     adc1: Adc<'static, ADC1<'static>, Blocking>,
-    switch_calib: Input<'static>,
-    switch_fly_mode: Input<'static>,
+    arm_switch: Input<'static>,
+    flight_mode_switch: Input<'static>,
+    // nagivation_button: Input<'static>,
     pub calibration: Option<RcCalibration>,
 }
 
@@ -58,7 +63,7 @@ impl HardwareContext {
 
         let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
 
-        let raw_axes = RawAxes::new(
+        let raw_axes = Axes::new(
             Self::read_pin(&mut pin_throttle, &mut adc1),
             Self::read_pin(&mut pin_yaw, &mut adc1),
             Self::read_pin(&mut pin_pitch, &mut adc1),
@@ -76,8 +81,11 @@ impl HardwareContext {
             pin_roll,
             raw_axes,
             adc1,
-            switch_calib: Input::new(io_calib, InputConfig::default().with_pull(Pull::Down)),
-            switch_fly_mode: Input::new(io_fly_mode, InputConfig::default().with_pull(Pull::Down)),
+            arm_switch: Input::new(io_calib, InputConfig::default().with_pull(Pull::Down)),
+            flight_mode_switch: Input::new(
+                io_fly_mode,
+                InputConfig::default().with_pull(Pull::Down),
+            ),
             // TODO: try to get calibration here and replace the None
             calibration: None,
         }
@@ -96,8 +104,8 @@ impl HardwareContext {
 
     /// # Raw Axes
     /// Reads the joystick pins, updates the `raw_axes` attribute and returns a `RawAxes` object.
-    pub fn raw_axes(&mut self) -> RawAxes {
-        self.raw_axes = RawAxes::new(
+    pub fn read_axes(&mut self) -> Axes {
+        self.raw_axes = Axes::new(
             Self::read_pin(&mut self.pin_throttle, &mut self.adc1),
             Self::read_pin(&mut self.pin_yaw, &mut self.adc1),
             Self::read_pin(&mut self.pin_pitch, &mut self.adc1),
@@ -106,55 +114,126 @@ impl HardwareContext {
         self.raw_axes
     }
 
+    /// # Oversampled Raw Axes
+    /// Reads the pins multiple times to average the value and overcome jitter.
+    pub fn read_axes_oversample(&mut self, basis: i32) -> Axes {
+        // Eventually, throw the first value away to avoid leftover charge in the microcontroller
+        // let _trash = self.read(adc);
+
+        let sample = 1 << basis; // 2^basis
+        let mut cnt = 0;
+
+        let mut summed_throttle: u32 = 0;
+        let mut summed_yaw: u32 = 0;
+        let mut summed_pitch: u32 = 0;
+        let mut summed_roll: u32 = 0;
+
+        while cnt < sample {
+            let axes = self.read_axes();
+            summed_throttle += axes.throttle() as u32;
+            summed_yaw += axes.yaw() as u32;
+            summed_pitch += axes.pitch() as u32;
+            summed_roll += axes.roll() as u32;
+            cnt += 1;
+        }
+        // bit shift is much faster than division by a power of 2
+        Axes::new(
+            (summed_throttle >> basis) as u16,
+            (summed_yaw >> basis) as u16,
+            (summed_pitch >> basis) as u16,
+            (summed_roll >> basis) as u16,
+        )
+    }
+
     /// TODO: doc
     pub fn raw_throttle(&mut self) -> u16 {
         Self::read_pin(&mut self.pin_throttle, &mut self.adc1)
     }
 
-    // /// TODO: doc
-    // pub fn raw_yaw(&mut self) -> u16 {
-    //     Self::read_pin(&mut self.pin_yaw, &mut self.adc1)
-    // }
-
-    // /// TODO: doc
-    // pub fn raw_pitch(&mut self) -> u16 {
-    //     Self::read_pin(&mut self.pin_pitch, &mut self.adc1)
-    // }
-
-    // /// TODO: doc
-    // pub fn raw_roll(&mut self) -> u16 {
-    //     Self::read_pin(&mut self.pin_roll, &mut self.adc1)
-    // }
-
-    // /// TODO: doc
-    // pub fn raw_axes(&mut self) -> RawAxes {
-    //     // temporary implementation
-    //     // we would need to use a specific algorithm configuration to feed the most natural jitter-free signal
-    //     self.axes(FlyingMode::Angle)
-    // }
+    /// # Connection to Serial
+    /// If the device is connected to a PC via serial, this function returns `true`. Else, it returns `false`.
+    fn connected_serial(&mut self) -> bool {
+        true
+    }
 
     /// TODO: doc
     pub fn update_system_state(&mut self, system_state: &mut SystemState) -> SystemState {
+        // First, check if the remote is connected to a computer
+        if self.connected_serial() {
+            *system_state = SystemState::Serial;
+            return *system_state;
+        }
+
+        // Else, the RC is autonomous. Handle a different logic
+        let armed = self.arm_switch.is_high();
         match system_state {
-            // update ground mode
-            SystemState::StandBy | SystemState::Calibration => {
-                *system_state = if self.switch_calib.is_high() {
-                    // reset calibration when switching to calibration mode
-                    self.calibration = None;
-                    SystemState::Calibration
-                } else {
-                    SystemState::StandBy
-                };
-            }
+            // TODO: handle enter in Calibration mode like so:
+            // SystemState::Disarm if calib_button_pushed => *system_state = SystemState::Calibration,
+            SystemState::Arm if !armed => *system_state = SystemState::Disarm,
+            SystemState::Disarm if armed => *system_state = SystemState::Arm,
             // update flying mode
             SystemState::Flying(mode) => {
-                *mode = if self.switch_fly_mode.is_high() {
+                *mode = if self.flight_mode_switch.is_high() {
                     FlyingMode::Acro
                 } else {
                     FlyingMode::Angle
                 };
             }
+            _ => {}
         };
         *system_state
+    }
+
+    /// # Calibration mode
+    /// In this version the user will move the joysticks at their extremities and the
+    /// system calibrates the axes to keep the historical minimum and maximum.
+    ///
+    /// For now, no center because it needs to give feedback to the user.
+    /// A system upgrade will include a screen to give calibration instructions.
+    pub fn tick_calib(&mut self) {
+        let calib_axes = self.read_axes();
+        match self.calibration.as_mut() {
+            Some(calibration) => calibration.update(calib_axes),
+            None => self.calibration = Some(RcCalibration::new(calib_axes)),
+        }
+    }
+
+    /// TODO: impl & doc
+    fn get_calib_memory() -> Option<RcCalibration> {
+        None
+    }
+
+    /// # Stand-by mode
+    /// In this mode, the RC won't send signals to the drone. The user can get ready to fly.
+    ///
+    /// If the throttle axis comes all the way down **AND** there is a calibration,
+    /// the system goes to `Flying` mode and the drone reacts to joystick movements.
+    ///
+    /// In this mode, if there is no calibration, the drone won't fly. The user needs to calibrate the RC before flying.
+    pub fn tick_standby(&mut self, system_state: &mut SystemState) {
+        if self.calibration.is_none() {
+            if let Some(calib_memory) = Self::get_calib_memory() {
+                self.calibration = Some(calib_memory.clone());
+                if self.raw_throttle() <= calib_memory.throttle_dead_zone() {
+                    // if throttle is down
+                    let flying_mode = if self.flight_mode_switch.is_high() {
+                        FlyingMode::Acro
+                    } else {
+                        FlyingMode::Angle
+                    };
+                    *system_state = SystemState::Flying(flying_mode);
+                }
+            } else {
+                // do nothing
+                println!("WARN: you need to calibrate the RC before flying!");
+                return;
+            }
+        }
+    }
+
+    /// TODO: use read_oversample
+    /// impl & doc
+    pub fn tick_serial(&mut self) {
+        Radio::send_serial(Filter::smooth(self.read_axes()));
     }
 }

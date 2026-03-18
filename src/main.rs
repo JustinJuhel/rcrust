@@ -9,7 +9,9 @@ use esp_hal::{
 };
 use esp_println::println;
 
-use read_gpio::{hardware_context::HardwareContext, system_state::SystemState};
+use read_gpio::{
+    filter::Filter, hardware_context::HardwareContext, radio::Radio, system_state::SystemState,
+};
 
 const LOOP_INTERVAL_MS: u64 = 10; // 100 Hz
 
@@ -34,9 +36,14 @@ fn main() -> ! {
 
         // update system state and tick in the right mode
         match context.update_system_state(&mut current_state) {
+            SystemState::Serial => context.tick_serial(),
+            // TODO: make a better calibration
             SystemState::Calibration => SystemState::tick_calib(&mut context),
-            SystemState::StandBy => current_state.tick_standby(&mut context),
-            SystemState::Flying(flying_mode) => SystemState::tick_fly(&mut context, flying_mode),
+            SystemState::Arm => current_state.tick_standby(&mut context),
+            // TODO: implement the flying mode
+            SystemState::Flying(_) => Radio::send_serial(Filter::smooth(context.read_axes())),
+            // TODO: check this is the behaviour we want in Disarm mode
+            SystemState::Disarm => {}
         }
     }
 }

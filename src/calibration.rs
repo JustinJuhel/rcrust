@@ -80,6 +80,6 @@ impl RcCalibration {
     /// lowest values.
     pub fn throttle_dead_zone(&self) -> u16 {
         let throttle = self.throttle;
-        throttle.min + 0.1 * (throtthe.max - throttle.min) as u16
+        throttle.min + (0.1 * (throttle.max - throttle.min) as f32) as u16
     }
 }
