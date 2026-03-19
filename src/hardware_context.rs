@@ -12,11 +12,7 @@ use esp_hal::{
 use esp_println::println;
 
 use crate::{
-    axes::Axes,
-    calibration::RcCalibration,
-    filter::Filter,
-    radio::Radio,
-    system_state::{FlyingMode, SystemState},
+    axes::Axes, calibration::RcCalibration, filter::Filter, radio::Radio, system_mode::SystemMode,
 };
 
 pub struct HardwareContext {
@@ -69,6 +65,13 @@ impl HardwareContext {
             Self::read_pin(&mut pin_pitch, &mut adc1),
             Self::read_pin(&mut pin_roll, &mut adc1),
         );
+
+        /*
+        // initialize rotary encoder
+        let timer = dp.TIM2;
+        let pins = (gpioa.pa0, gpioa.pa1); // Channels 1 and 2
+        let encoder = RotaryEncoder::new(timer, pins);
+        */
 
         Self {
             // throttle_axis: AutoCalibAxis::new(pin_throttle, window, cutoff_hz, sample_rate_hz),
@@ -157,31 +160,37 @@ impl HardwareContext {
     }
 
     /// TODO: doc
-    pub fn update_system_state(&mut self, system_state: &mut SystemState) -> SystemState {
-        // First, check if the remote is connected to a computer
-        if self.connected_serial() {
-            *system_state = SystemState::Serial;
-            return *system_state;
-        }
+    pub fn update_system_mode(&mut self, mode: &mut SystemMode) -> SystemMode {
+        SystemMode::Serial
+        // *mode = match *mode {
+        //     any if self.connected_serial() => SystemMode::Serial,
+        // };
+        // return *mode;
 
-        // Else, the RC is autonomous. Handle a different logic
-        let armed = self.arm_switch.is_high();
-        match system_state {
-            // TODO: handle enter in Calibration mode like so:
-            // SystemState::Disarm if calib_button_pushed => *system_state = SystemState::Calibration,
-            SystemState::Arm if !armed => *system_state = SystemState::Disarm,
-            SystemState::Disarm if armed => *system_state = SystemState::Arm,
-            // update flying mode
-            SystemState::Flying(mode) => {
-                *mode = if self.flight_mode_switch.is_high() {
-                    FlyingMode::Acro
-                } else {
-                    FlyingMode::Angle
-                };
-            }
-            _ => {}
-        };
-        *system_state
+        // // First, check if the remote is connected to a computer
+        // if self.connected_serial() {
+        //     *mode = SystemMode::Serial;
+        //     return *mode;
+        // }
+
+        // // Else, the RC is autonomous. Handle a different logic
+        // let armed = self.arm_switch.is_high();
+        // match mode {
+        //     // TODO: handle enter in Calibration mode like so:
+        //     // SystemState::Disarm if calib_button_pushed => *system_state = SystemState::Calibration,
+        //     SystemState::Arm if !armed => *mode = SystemState::Disarm,
+        //     SystemState::Disarm if armed => *mode = SystemState::Arm,
+        //     // update flying mode
+        //     SystemState::Flying(mode) => {
+        //         *mode = if self.flight_mode_switch.is_high() {
+        //             FlyingMode::Acro
+        //         } else {
+        //             FlyingMode::Angle
+        //         };
+        //     }
+        //     _ => {}
+        // };
+        // *mode
     }
 
     /// # Calibration mode
@@ -203,37 +212,41 @@ impl HardwareContext {
         None
     }
 
-    /// # Stand-by mode
-    /// In this mode, the RC won't send signals to the drone. The user can get ready to fly.
-    ///
-    /// If the throttle axis comes all the way down **AND** there is a calibration,
-    /// the system goes to `Flying` mode and the drone reacts to joystick movements.
-    ///
-    /// In this mode, if there is no calibration, the drone won't fly. The user needs to calibrate the RC before flying.
-    pub fn tick_standby(&mut self, system_state: &mut SystemState) {
-        if self.calibration.is_none() {
-            if let Some(calib_memory) = Self::get_calib_memory() {
-                self.calibration = Some(calib_memory.clone());
-                if self.raw_throttle() <= calib_memory.throttle_dead_zone() {
-                    // if throttle is down
-                    let flying_mode = if self.flight_mode_switch.is_high() {
-                        FlyingMode::Acro
-                    } else {
-                        FlyingMode::Angle
-                    };
-                    *system_state = SystemState::Flying(flying_mode);
-                }
-            } else {
-                // do nothing
-                println!("WARN: you need to calibrate the RC before flying!");
-                return;
-            }
-        }
-    }
+    // useless ? in Disarm we do nothing.
+    // /// # Stand-by mode
+    // /// In this mode, the RC won't send signals to the drone. The user can get ready to fly.
+    // ///
+    // /// If the throttle axis comes all the way down **AND** there is a calibration,
+    // /// the system goes to `Flying` mode and the drone reacts to joystick movements.
+    // ///
+    // /// In this mode, if there is no calibration, the drone won't fly. The user needs to calibrate the RC before flying.
+    // pub fn tick_standby(&mut self, system_state: &mut SystemState) {
+    //     if self.calibration.is_none() {
+    //         if let Some(calib_memory) = Self::get_calib_memory() {
+    //             self.calibration = Some(calib_memory.clone());
+    //             if self.raw_throttle() <= calib_memory.throttle_dead_zone() {
+    //                 // if throttle is down
+    //                 let flying_mode = if self.flight_mode_switch.is_high() {
+    //                     FlyingMode::Acro
+    //                 } else {
+    //                     FlyingMode::Angle
+    //                 };
+    //                 *system_state = SystemState::Flying(flying_mode);
+    //             }
+    //         } else {
+    //             // do nothing
+    //             println!("WARN: you need to calibrate the RC before flying!");
+    //             return;
+    //         }
+    //     }
+    // }
 
-    /// TODO: use read_oversample
-    /// impl & doc
-    pub fn tick_serial(&mut self) {
-        Radio::send_serial(Filter::smooth(self.read_axes()));
-    }
+    // useless except if the logic becomes more complex.
+    // /// TODO: use read_oversample
+    // /// impl & doc
+    // pub fn tick_serial(&mut self, &mut filter: Filter) {
+    //     let axes = self.read_axes();
+    //     let smooth = filter.smooth(axes);
+    //     Radio::send_serial(smooth);
+    // }
 }

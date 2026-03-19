@@ -14,4 +14,7 @@ impl Radio {
             axes.roll()
         );
     }
+
+    /// TODO: impl & doc
+    pub fn send_radio(axes: RawAxes) {}
 }

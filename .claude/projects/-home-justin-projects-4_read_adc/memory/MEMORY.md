@@ -1,0 +1,1 @@
+- [feedback_minimal_changes.md](feedback_minimal_changes.md) - Only change what's strictly necessary; preserve all comments, TODOs, logic, and structure
