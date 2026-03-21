@@ -1,91 +1,52 @@
 #![no_std]
 #![no_main]
 
-use esp_backtrace as _;
-esp_bootloader_esp_idf::esp_app_desc!();
-use esp_hal::{
-    analog::adc::{Adc, AdcConfig, Attenuation},
-    main, time::{Duration, Instant},
-};
-use esp_println::println;
+use defmt::info;
+use defmt_rtt as _;
+use embassy_executor::Spawner;
+use embassy_stm32::Config;
+use embassy_stm32::adc::{Adc, SampleTime};
+use embassy_time::{Duration, Ticker};
+use panic_probe as _;
 
 use read_gpio::axis::axis::AutoCalibAxis;
 
 const INTERVAL_US: u64 = 1000;
 
+#[embassy_executor::main]
+async fn main(_spawner: Spawner) {
+    let p = embassy_stm32::init(Config::default());
 
-#[main]
-fn main() -> ! {
-    let peripherals = esp_hal::init(esp_hal::Config::default());
-    // TODO: use the "Interrupt" approach
-    let tick_rate = Duration::from_micros(INTERVAL_US);
+    let mut adc = Adc::new(p.ADC1);
+    adc.set_sample_time(SampleTime::CYCLES480); // slow sample = more accuracy
+    adc.set_resolution(embassy_stm32::adc::Resolution::BITS12);
 
+    let mut pin_throttle = p.PA0;
+    let mut pin_yaw = p.PA1;
+    let mut pin_pitch = p.PA4;
+    let mut pin_roll = p.PA5;
+
+    let cutoff_hz: f32 = 15.0;
+    let sample_rate_hz: f32 = 1000.0;
     let window: f32 = 30.0;
-    // PT3 Filter parameters
-    let cutoff_hz: f32 = 15.0; // Hz
-    let sample_rate_hz: f32 = 1000.0; // Hz
 
-    let mut adc1_config = AdcConfig::new();
+    let mut throttle_axis = AutoCalibAxis::new(window, cutoff_hz, sample_rate_hz);
+    let mut yaw_axis = AutoCalibAxis::new(window, cutoff_hz, sample_rate_hz);
+    let mut pitch_axis = AutoCalibAxis::new(window, cutoff_hz, sample_rate_hz);
+    let mut roll_axis = AutoCalibAxis::new(window, cutoff_hz, sample_rate_hz);
 
-    // throttle, D32
-    let pin_throttle = adc1_config.enable_pin(peripherals.GPIO13, Attenuation::_11dB);
-    // yaw, D34
-    let pin_yaw = adc1_config.enable_pin(peripherals.GPIO14, Attenuation::_11dB);
-    // pitch, VP
-    let pin_pitch = adc1_config.enable_pin(peripherals.GPIO4, Attenuation::_11dB);
-    // roll, D33
-    let pin_roll = adc1_config.enable_pin(peripherals.GPIO12, Attenuation::_11dB);
+    let mut ticker = Ticker::every(Duration::from_micros(INTERVAL_US));
 
-    let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
-
-    let mut throttle_axis = AutoCalibAxis::new(
-        pin_throttle,
-        window,
-        cutoff_hz,
-        sample_rate_hz,
-    );
-    let mut yaw_axis = AutoCalibAxis::new(
-        pin_yaw,
-        window,
-        cutoff_hz,
-        sample_rate_hz,
-    );
-    let mut pitch_axis = AutoCalibAxis::new(
-        pin_pitch,
-        window,
-        cutoff_hz,
-        sample_rate_hz,
-    );
-    let mut roll_axis = AutoCalibAxis::new(
-        pin_roll,
-        window,
-        cutoff_hz,
-        sample_rate_hz,
-    );
-
-    let mut next_tick = Instant::now();
-
-    println!("Joystick initialized. Reading values...");
+    info!("Joystick initialized. Reading values...");
 
     loop {
-        // wait until the window is up
-        while Instant::now() < next_tick {
-            core::hint::spin_loop();
-        }
+        ticker.next().await;
 
-        next_tick += tick_rate;
+        let throttle = throttle_axis.process(&mut adc, &mut pin_throttle);
+        let yaw = yaw_axis.process(&mut adc, &mut pin_yaw);
+        let pitch = pitch_axis.process(&mut adc, &mut pin_pitch);
+        let roll = roll_axis.process(&mut adc, &mut pin_roll);
 
-        let throttle = throttle_axis.process(&mut adc1);
-        let yaw = yaw_axis.process(&mut adc1);
-        let pitch = pitch_axis.process(&mut adc1);
-        let roll = roll_axis.process(&mut adc1);
-
-        println!(
-            "{:.2}, {:.2}, {:.2}, {:.2}",
-            throttle,
-            yaw,
-            pitch,
-            roll,
-        );
+        info!("{}, {}, {}, {}", throttle, yaw, pitch, roll);
     }
 }

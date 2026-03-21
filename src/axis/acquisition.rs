@@ -1,23 +1,21 @@
-use esp_hal::{Blocking, analog::adc::{Adc, AdcChannel}, peripherals::ADC1};
+use embassy_stm32::adc::{Adc, AdcChannel, Instance};
 
 use crate::axis::axis::AutoCalibAxis;
 
-
-impl<PIN: AdcChannel> AutoCalibAxis<PIN> {
-    /// Read the analog pin multiple times and average them.
-    /// The goal is to overcome the sensor jitter.
-    pub(super) fn read_oversample(&mut self, adc: &mut Adc<'static, ADC1<'static>, Blocking>) -> u16 {
-        // throw the first value away to avoid leftover charge in the microcontroller
-        let _trash = self.read(adc);
+impl AutoCalibAxis {
+    pub(super) fn read_oversample<T: Instance, P: AdcChannel<T>>(
+        &mut self,
+        adc: &mut Adc<'_, T>,
+        pin: &mut P,
+    ) -> u16 {
+        let _trash = Self::read(adc, pin);
 
         let basis = 6;
-
-        // let sample = 64;
-        let sample = 1 << basis; // 2^basis
+        let sample = 1 << basis;
         let mut summed_raw: u32 = 0;
         let mut cnt = 0;
         while cnt < sample {
-            summed_raw += self.read(adc) as u32;
+            summed_raw += Self::read(adc, pin) as u32;
             cnt += 1;
         }
         // bit shift by 6 is much faster than division by 64
