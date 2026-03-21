@@ -1,15 +1,8 @@
-[target.xtensa-esp32-none-elf]
-runner = "espflash flash --monitor --chip esp32"
-
-[env]
-ESP_LOG="info"
+[target.thumbv7em-none-eabihf]
+runner = "probe-rs run --chip STM32F401RCTx"
 
 [build]
-rustflags = [
-  "-C", "link-arg=-nostartfiles",
-]
+target = "thumbv7em-none-eabihf"
 
-target = "xtensa-esp32-none-elf"
-
-[unstable]
-build-std = ["core"]
+[env]
+DEFMT_LOG = "info"
