@@ -15,9 +15,10 @@ const INTERVAL_US: u64 = 1000;
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
-    let (mut adc, mut pin_throttle, mut pin_yaw, mut pin_pitch, mut pin_roll, mut cdc) = init_rc(spawner);
+    let (mut adc, mut pin_throttle, mut pin_yaw, mut pin_pitch, mut pin_roll, mut cdc) =
+        init_rc(spawner);
 
-    let window: f32 = 30.0;
+    let window: f32 = 8.0;
 
     let mut throttle_axis = Axis::new(window);
     let mut yaw_axis = Axis::new(window);
