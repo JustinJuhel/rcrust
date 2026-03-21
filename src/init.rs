@@ -19,10 +19,21 @@ async fn usb_task(mut device: UsbDevice<'static, Driver<'static, peripherals::US
     device.run().await;
 }
 
+/// # Initialize RC
+/// This function is called at boot and does the following tasks:
+/// - Clock configuration
+/// - USB CDC-ACM setup
+/// - ADC setup
+///
+/// And returns the peripherals to be used in the main loop.
 pub fn init_rc(
     spawner: Spawner,
 ) -> (
-    Adc<'static, ADC1>, PA1, PA2, PB0, PB1,
+    Adc<'static, ADC1>,
+    PA1,
+    PA2,
+    PB0,
+    PB1,
     CdcAcmClass<'static, Driver<'static, USB_OTG_FS>>,
 ) {
     // Configure clocks: HSE 25 MHz (typical BlackPill) -> PLL -> 84 MHz sys, 48 MHz USB

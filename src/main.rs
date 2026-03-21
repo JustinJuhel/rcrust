@@ -6,10 +6,10 @@ use core::fmt::Write;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Ticker};
+use heapless::String;
 use panic_probe as _;
 use read_gpio::axis::Axis;
 use read_gpio::init::init_rc;
-use read_gpio::serial::BufWriter;
 
 const INTERVAL_US: u64 = 1000;
 
@@ -29,8 +29,6 @@ async fn main(spawner: Spawner) {
     // Wait for USB host to connect
     cdc.wait_connection().await;
 
-    let mut buf = [0u8; 64];
-
     loop {
         ticker.next().await;
 
@@ -40,9 +38,8 @@ async fn main(spawner: Spawner) {
         let roll = roll_axis.process(&mut adc, &mut pin_roll);
 
         // Format into buffer and send over USB CDC
-        let mut wrapper = BufWriter::new(&mut buf);
-        let _ = write!(wrapper, "{}, {}, {}, {}\r\n", throttle, yaw, pitch, roll);
-        let len = wrapper.pos();
-        let _ = cdc.write_packet(&buf[..len]).await;
+        let mut buf: String<64> = String::new();
+        let _ = write!(buf, "{}, {}, {}, {}\r\n", throttle, yaw, pitch, roll);
+        let _ = cdc.write_packet(buf.as_bytes()).await;
     }
 }

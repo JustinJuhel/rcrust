@@ -20,6 +20,7 @@ static_cell = "2"
 defmt = "1"
 defmt-rtt = "1"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
+heapless = "0.8"
 
 [profile.dev]
 # Rust debug is too slow.
