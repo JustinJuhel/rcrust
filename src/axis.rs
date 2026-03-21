@@ -3,8 +3,8 @@ use embassy_stm32::adc::{Adc, AdcChannel, Instance};
 /// # Axis
 /// This struct is used to read values from pins and store data used by the EMA filter.
 pub struct Axis {
-    pub(super) last_filtered: Option<f32>,
-    pub(super) alpha: f32,
+    last_filtered: Option<f32>,
+    alpha: f32,
 }
 
 impl Axis {
@@ -19,7 +19,7 @@ impl Axis {
 
     /// # Read
     /// Reads the provided hardware pin and return its value as an `u16`.
-    pub(super) fn read<T: Instance, P: AdcChannel<T>>(adc: &mut Adc<'_, T>, pin: &mut P) -> u16 {
+    pub fn read<T: Instance, P: AdcChannel<T>>(adc: &mut Adc<'_, T>, pin: &mut P) -> u16 {
         adc.blocking_read(pin)
     }
 
