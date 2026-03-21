@@ -128,15 +128,9 @@ async fn main(spawner: Spawner) {
         let pitch = pitch_axis.process(&mut adc, &mut pin_pitch);
         let roll = roll_axis.process(&mut adc, &mut pin_roll);
 
-        // let r0 = adc.blocking_read(&mut pin_throttle);
-        // let r1 = adc.blocking_read(&mut pin_yaw);
-        // let r4 = adc.blocking_read(&mut pin_pitch);
-        // let r5 = adc.blocking_read(&mut pin_roll);
-
         // Format into buffer and send over USB CDC
         let mut wrapper = BufWriter::new(&mut buf);
         let _ = write!(wrapper, "{}, {}, {}, {}\r\n", throttle, yaw, pitch, roll);
-        // let _ = write!(wrapper, "{}, {}, {}, {}\r\n", r0, r1, r4, r5);
         let len = wrapper.pos;
         let _ = cdc.write_packet(&buf[..len]).await;
     }

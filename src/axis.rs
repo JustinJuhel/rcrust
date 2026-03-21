@@ -1,8 +1,31 @@
 use embassy_stm32::adc::{Adc, AdcChannel, Instance};
 
-use crate::axis::axis::AutoCalibAxis;
+pub struct AutoCalibAxis {
+    pub(super) last_filtered: Option<f32>,
+    pub(super) alpha: f32,
+}
 
 impl AutoCalibAxis {
+    pub fn new(window: f32) -> Self {
+        Self {
+            last_filtered: None,
+            alpha: 2.0 / (window + 1.0),
+        }
+    }
+
+    pub(super) fn read<T: Instance, P: AdcChannel<T>>(adc: &mut Adc<'_, T>, pin: &mut P) -> u16 {
+        adc.blocking_read(pin)
+    }
+
+    pub fn process<T: Instance, P: AdcChannel<T>>(
+        &mut self,
+        adc: &mut Adc<'_, T>,
+        pin: &mut P,
+    ) -> u16 {
+        let raw = self.read_oversample(adc, pin);
+        self.exponential_moving_average(raw)
+    }
+
     pub(super) fn read_oversample<T: Instance, P: AdcChannel<T>>(
         &mut self,
         adc: &mut Adc<'_, T>,
