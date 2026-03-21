@@ -1,11 +1,15 @@
 use embassy_stm32::adc::{Adc, AdcChannel, Instance};
 
-pub struct AutoCalibAxis {
+/// # Axis
+/// This struct is used to read values from pins and store data used by the EMA filter.
+pub struct Axis {
     pub(super) last_filtered: Option<f32>,
     pub(super) alpha: f32,
 }
 
-impl AutoCalibAxis {
+impl Axis {
+    /// # New
+    /// `Axis` instanciation. The `window` argument affects the EMA filter's sensitivity. The higher `window`, the more "low-pass" the filter.
     pub fn new(window: f32) -> Self {
         Self {
             last_filtered: None,
@@ -13,10 +17,16 @@ impl AutoCalibAxis {
         }
     }
 
+    /// # Read
+    /// Reads the provided hardware pin and return its value as an `u16`.
     pub(super) fn read<T: Instance, P: AdcChannel<T>>(adc: &mut Adc<'_, T>, pin: &mut P) -> u16 {
         adc.blocking_read(pin)
     }
 
+    /// # Process
+    /// Processes raw data:
+    /// - oversample by reading several times the same pin, in order to smooth the signal and suppress hardware jitter,
+    /// - apply an exponential moving average filter to smooth the signal.
     pub fn process<T: Instance, P: AdcChannel<T>>(
         &mut self,
         adc: &mut Adc<'_, T>,
@@ -26,7 +36,13 @@ impl AutoCalibAxis {
         self.exponential_moving_average(raw)
     }
 
-    pub(super) fn read_oversample<T: Instance, P: AdcChannel<T>>(
+    /// # Read with Oversampling
+    /// This function firstly reads the pin once and doesn't take the value into account. This happens because of an ADC crosstalk problem.
+    /// The STM32 has only one Analog-to-Digital converter which is shared between all the pins. This can cause the voltage level of one analog input channel to
+    /// influence the reading of another.
+    ///
+    /// Then, this function reads 64 times the same pin and computes an average.
+    fn read_oversample<T: Instance, P: AdcChannel<T>>(
         &mut self,
         adc: &mut Adc<'_, T>,
         pin: &mut P,
@@ -46,8 +62,9 @@ impl AutoCalibAxis {
         (summed_raw >> basis) as u16
     }
 
-    /// EMA (exponential moving average) filter. Computationally cheap. Smoothes out sensor jitter.
-    pub(super) fn exponential_moving_average(&mut self, raw: u16) -> u16 {
+    /// # EMA (exponential moving average) filter.
+    /// Computationally cheap. Smoothes out sensor jitter.
+    fn exponential_moving_average(&mut self, raw: u16) -> u16 {
         let current = raw as f32;
 
         let filtered = match self.last_filtered {

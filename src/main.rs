@@ -13,9 +13,8 @@ use embassy_time::{Duration, Ticker};
 use embassy_usb::UsbDevice;
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use panic_probe as _;
+use read_gpio::axis::Axis;
 use static_cell::StaticCell;
-
-use read_gpio::axis::axis::AutoCalibAxis;
 
 const INTERVAL_US: u64 = 1000;
 
@@ -104,14 +103,12 @@ async fn main(spawner: Spawner) {
     let mut pin_pitch = p.PB0;
     let mut pin_roll = p.PB1;
 
-    let cutoff_hz: f32 = 15.0;
-    let sample_rate_hz: f32 = 1000.0;
     let window: f32 = 30.0;
 
-    let mut throttle_axis = AutoCalibAxis::new(window, cutoff_hz, sample_rate_hz);
-    let mut yaw_axis = AutoCalibAxis::new(window, cutoff_hz, sample_rate_hz);
-    let mut pitch_axis = AutoCalibAxis::new(window, cutoff_hz, sample_rate_hz);
-    let mut roll_axis = AutoCalibAxis::new(window, cutoff_hz, sample_rate_hz);
+    let mut throttle_axis = Axis::new(window);
+    let mut yaw_axis = Axis::new(window);
+    let mut pitch_axis = Axis::new(window);
+    let mut roll_axis = Axis::new(window);
 
     let mut ticker = Ticker::every(Duration::from_micros(INTERVAL_US));
 
