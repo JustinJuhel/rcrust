@@ -23,7 +23,7 @@ async fn main(spawner: Spawner) {
         ticker.next().await;
 
         let axes = context.read_oversample();
-        let axes = processing.exponential_moving_average(axes);
+        let axes = processing.process(axes);
         radio.send_serial(axes).await;
     }
 }

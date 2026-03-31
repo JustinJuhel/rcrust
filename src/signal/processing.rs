@@ -21,18 +21,12 @@ impl Processing {
 }
 
 impl Processing {
-    // /// # Process
-    // /// Processes raw data:
-    // /// - oversample by reading several times the same pin, in order to smooth the signal and suppress hardware jitter,
-    // /// - apply an exponential moving average filter to smooth the signal.
-    // pub fn process(
-    //     &mut self,
-    //     context: &mut HardwareContext,
-    //     axes: &mut Axes
-    // ) -> u16 {
-    //     let raw = self.read_oversample(adc, pin);
-    //     self.exponential_moving_average(raw)
-    // }
+    /// # Process
+    /// Processes raw data:
+    /// - apply an exponential moving average filter to smooth the signal.
+    pub fn process(&mut self, axes: Axes) -> Axes {
+        self.exponential_moving_average(axes)
+    }
 
     /// # EMA (exponential moving average) filter.
     /// Computationally cheap. Smoothes out sensor jitter.
