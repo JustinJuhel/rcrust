@@ -1,7 +1,6 @@
 use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{Adc, SampleTime};
-use embassy_stm32::peripherals::{ADC1, PA1, PA2, PB0, PB1, USB_OTG_FS};
 use embassy_stm32::time::Hertz;
 use embassy_stm32::usb::Driver;
 use embassy_stm32::{Config, bind_interrupts, peripherals};
@@ -9,6 +8,9 @@ use embassy_usb::UsbDevice;
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use panic_probe as _;
 use static_cell::StaticCell;
+
+use crate::hardware::context::HardwareContext;
+use crate::hardware::radio::Radio;
 
 bind_interrupts!(struct Irqs {
     OTG_FS => embassy_stm32::usb::InterruptHandler<peripherals::USB_OTG_FS>;
@@ -29,12 +31,14 @@ async fn usb_task(mut device: UsbDevice<'static, Driver<'static, peripherals::US
 pub fn init_rc(
     spawner: Spawner,
 ) -> (
-    Adc<'static, ADC1>,
-    PA1,
-    PA2,
-    PB0,
-    PB1,
-    CdcAcmClass<'static, Driver<'static, USB_OTG_FS>>,
+    HardwareContext,
+    Radio,
+    // Adc<'static, ADC1>,
+    // PA1,
+    // PA2,
+    // PB0,
+    // PB1,
+    // CdcAcmClass<'static, Driver<'static, USB_OTG_FS>>,
 ) {
     // Configure clocks: HSE 25 MHz (typical BlackPill) -> PLL -> 84 MHz sys, 48 MHz USB
     let mut config = Config::default();
@@ -105,5 +109,9 @@ pub fn init_rc(
     adc.set_sample_time(SampleTime::CYCLES480);
     adc.set_resolution(embassy_stm32::adc::Resolution::BITS12);
 
-    (adc, p.PA1, p.PA2, p.PB0, p.PB1, cdc)
+    // (adc, p.PA1, p.PA2, p.PB0, p.PB1, cdc)
+    (
+        HardwareContext::new(adc, p.PA1, p.PA2, p.PB0, p.PB1),
+        Radio::new(cdc),
+    )
 }
