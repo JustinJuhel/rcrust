@@ -19,6 +19,8 @@ async fn main(spawner: Spawner) {
 
     let mut ticker = Ticker::every(Duration::from_micros(INTERVAL_US));
 
+    // useless comment
+
     loop {
         ticker.next().await;
 
