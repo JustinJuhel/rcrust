@@ -24,12 +24,10 @@ async fn main(spawner: Spawner) {
     let (mut adc, mut pin_throttle, mut pin_yaw, mut pin_pitch, mut pin_roll, mut cdc, mut display) =
         init_rc(spawner);
 
-    let window: f32 = 3.0;
-
-    let mut throttle_axis = Axis::new(window);
-    let mut yaw_axis = Axis::new(window);
-    let mut pitch_axis = Axis::new(window);
-    let mut roll_axis = Axis::new(window);
+    let mut throttle_axis = Axis::new();
+    let mut yaw_axis = Axis::new();
+    let mut pitch_axis = Axis::new();
+    let mut roll_axis = Axis::new();
 
     let mut ticker = Ticker::every(Duration::from_micros(INTERVAL_US));
     let mut display_counter: u16 = 0;
