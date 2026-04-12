@@ -4,7 +4,8 @@
 use core::fmt::Write;
 
 use embassy_executor::Spawner;
-use embassy_time::{Duration, Ticker};
+use embassy_futures::select::select;
+use embassy_time::{Duration, Ticker, Timer};
 use heapless::String;
 use panic_rtt_target as _;
 use rtt_target::rtt_init_print;
@@ -29,10 +30,10 @@ async fn main(spawner: Spawner) {
     let mut pitch_axis = Axis::new();
     let mut roll_axis = Axis::new();
 
+    cdc.wait_connection().await;
+
     let mut ticker = Ticker::every(Duration::from_micros(INTERVAL_US));
     let mut display_counter: u16 = 0;
-
-    cdc.wait_connection().await;
 
     loop {
         ticker.next().await;
@@ -42,7 +43,6 @@ async fn main(spawner: Spawner) {
         let pitch = pitch_axis.process(&mut adc, &mut pin_pitch);
         let roll = roll_axis.process(&mut adc, &mut pin_roll);
 
-        // We update the display only once every `DISPLAY_INTERVAL` iteration because it is costly.
         display_counter += 1;
         if display_counter >= DISPLAY_INTERVAL {
             display_counter = 0;
@@ -51,6 +51,11 @@ async fn main(spawner: Spawner) {
 
         let mut buf: String<64> = String::new();
         let _ = write!(buf, "{}, {}, {}, {}\r\n", throttle, yaw, pitch, roll);
-        let _ = cdc.write_packet(buf.as_bytes()).await;
+        // Timeout prevents the loop from stalling if the USB host disconnects.
+        let _ = select(
+            cdc.write_packet(buf.as_bytes()),
+            Timer::after(Duration::from_millis(2)),
+        )
+        .await;
     }
 }
