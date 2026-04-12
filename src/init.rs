@@ -47,9 +47,9 @@ pub type Lcd = mipidsi::Display<
 /// # Initialize RC
 /// This function is called at boot and does the following tasks:
 /// * Clock configuration
-/// * USB CDC-ACM setup
+/// * SPI display setup (ILI9341) — done first to avoid blocking after USB task is spawned
 /// * ADC setup
-/// * SPI display setup (ILI9341)
+/// * USB CDC-ACM setup — spawned last so enumeration starts with no pending blocking work
 ///
 /// And returns the peripherals to be used in the main loop.
 pub fn init_rc(
@@ -86,7 +86,38 @@ pub fn init_rc(
     }
     let p = embassy_stm32::init(config);
 
-    // USB CDC setup
+    // SPI2 + ILI9341 display setup — done before USB so the blocking SPI
+    // transfers don't starve the USB task of executor time.
+    let mut spi_config = spi::Config::default();
+    spi_config.frequency = Hertz(10_000_000);
+
+    let spi = Spi::new_blocking_txonly(p.SPI2, p.PB10, p.PB15, spi_config);
+    let cs = Output::new(p.PB12, Level::High, Speed::VeryHigh);
+    let dc = Output::new(p.PB13, Level::Low, Speed::VeryHigh);
+    let mut rst = Output::new(p.PB14, Level::Low, Speed::VeryHigh);
+
+    cortex_m::asm::delay(84_000 * 10);
+    rst.set_high();
+    cortex_m::asm::delay(84_000 * 120);
+
+    let spi_dev = ExclusiveDevice::new_no_delay(spi, cs).unwrap();
+    let di = SPIInterface::new(spi_dev, dc);
+
+    let mut display = mipidsi::Builder::new(ILI9341Rgb565, di)
+        .reset_pin(rst)
+        .orientation(Orientation::new().rotate(Rotation::Deg90))
+        .init(&mut embassy_time::Delay)
+        .unwrap();
+
+    display.clear(Rgb565::BLACK).unwrap();
+
+    // ADC setup
+    let mut adc = Adc::new(p.ADC1);
+    adc.set_sample_time(SampleTime::CYCLES56);
+    adc.set_resolution(embassy_stm32::adc::Resolution::BITS12);
+
+    // USB CDC setup — spawned last so the USB task starts with no blocking
+    // work ahead of it in the executor.
     static EP_OUT_BUFFER: StaticCell<[u8; 256]> = StaticCell::new();
     let ep_out_buffer = EP_OUT_BUFFER.init([0u8; 256]);
 
@@ -126,35 +157,6 @@ pub fn init_rc(
 
     let usb_device = builder.build();
     spawner.must_spawn(usb_task(usb_device));
-
-    // ADC setup
-    let mut adc = Adc::new(p.ADC1);
-    adc.set_sample_time(SampleTime::CYCLES56);
-    adc.set_resolution(embassy_stm32::adc::Resolution::BITS12);
-
-    // SPI2 + ILI9341 display setup
-    let mut spi_config = spi::Config::default();
-    spi_config.frequency = Hertz(10_000_000);
-
-    let spi = Spi::new_blocking_txonly(p.SPI2, p.PB10, p.PB15, spi_config);
-    let cs = Output::new(p.PB12, Level::High, Speed::VeryHigh);
-    let dc = Output::new(p.PB13, Level::Low, Speed::VeryHigh);
-    let mut rst = Output::new(p.PB14, Level::Low, Speed::VeryHigh);
-
-    cortex_m::asm::delay(84_000 * 10);
-    rst.set_high();
-    cortex_m::asm::delay(84_000 * 120);
-
-    let spi_dev = ExclusiveDevice::new_no_delay(spi, cs).unwrap();
-    let di = SPIInterface::new(spi_dev, dc);
-
-    let mut display = mipidsi::Builder::new(ILI9341Rgb565, di)
-        .reset_pin(rst)
-        .orientation(Orientation::new().rotate(Rotation::Deg90))
-        .init(&mut embassy_time::Delay)
-        .unwrap();
-
-    display.clear(Rgb565::BLACK).unwrap();
 
     (adc, p.PA0, p.PA1, p.PB0, p.PB1, cdc, display)
 }

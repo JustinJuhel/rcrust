@@ -767,6 +767,7 @@ dependencies = [
  "cortex-m-rt",
  "display-interface-spi",
  "embassy-executor",
+ "embassy-futures",
  "embassy-stm32",
  "embassy-time",
  "embassy-usb",
