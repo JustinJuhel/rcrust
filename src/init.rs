@@ -27,6 +27,14 @@ async fn usb_task(mut device: UsbDevice<'static, Driver<'static, peripherals::US
     device.run().await;
 }
 
+/// # LCD
+/// A high-level handle for the ILI9341 LCD Display.
+///
+/// This type represents a display configured with:
+/// * **Interface:** SPI using a blocking driver.
+/// * **Bus Management:** Exclusive access (the SPI bus is dedicated to this display).
+/// * **Color Protocol:** RGB565 (16-bit color).
+/// * **Controller:** ILI9341.
 pub type Lcd = mipidsi::Display<
     SPIInterface<
         ExclusiveDevice<Spi<'static, Blocking>, Output<'static>, embedded_hal_bus::spi::NoDelay>,

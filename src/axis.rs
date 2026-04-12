@@ -1,12 +1,11 @@
 use embassy_stm32::adc::{Adc, AdcChannel, Instance};
 
 /// # Axis
-/// This struct is used to read values from pins and store data used by the EMA filter.
+/// This struct is used to read values from pins.
 pub struct Axis {}
 
 impl Axis {
     /// # New
-    /// `Axis` instanciation. The `window` argument affects the EMA filter's sensitivity. The higher `window`, the more "low-pass" the filter.
     pub fn new() -> Self {
         Self {}
     }
@@ -19,15 +18,13 @@ impl Axis {
 
     /// # Process
     /// Processes raw data:
-    /// - oversample by reading several times the same pin, in order to smooth the signal and suppress hardware jitter,
-    /// - apply an exponential moving average filter to smooth the signal.
+    /// * oversample by reading several times the same pin, in order to smooth the signal and suppress hardware jitter,
     pub fn process<T: Instance, P: AdcChannel<T>>(
         &mut self,
         adc: &mut Adc<'_, T>,
         pin: &mut P,
     ) -> u16 {
         let raw = self.read_oversample(adc, pin);
-        // let raw = self.exponential_moving_average(raw);
         raw
     }
 
@@ -51,7 +48,6 @@ impl Axis {
             cnt += 1;
         }
         // bit shift by 6 is much faster than division by 64
-        // summed_raw >> 6
         (summed_raw >> basis) as u16
     }
 }
