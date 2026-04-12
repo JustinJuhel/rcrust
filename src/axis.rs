@@ -33,7 +33,8 @@ impl Axis {
         pin: &mut P,
     ) -> u16 {
         let raw = self.read_oversample(adc, pin);
-        self.exponential_moving_average(raw)
+        // let raw = self.exponential_moving_average(raw);
+        raw
     }
 
     /// # Read with Oversampling
