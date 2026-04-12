@@ -3,11 +3,12 @@
 
 use core::fmt::Write;
 
-use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Ticker};
 use heapless::String;
-use panic_probe as _;
+use panic_rtt_target as _;
+use rtt_target::rtt_init_print;
+
 use read_gpio::axis::Axis;
 use read_gpio::init::init_rc;
 
@@ -15,9 +16,13 @@ const INTERVAL_US: u64 = 1000;
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
-    let (mut adc, mut pin_throttle, mut pin_yaw, mut pin_pitch, mut pin_roll, mut cdc) = init_rc(spawner);
+    // RTT is only used for logs over ST-LINK/SWD.
+    rtt_init_print!();
 
-    let window: f32 = 30.0;
+    let (mut adc, mut pin_throttle, mut pin_yaw, mut pin_pitch, mut pin_roll, mut cdc) =
+        init_rc(spawner);
+
+    let window: f32 = 3.0;
 
     let mut throttle_axis = Axis::new(window);
     let mut yaw_axis = Axis::new(window);
@@ -26,7 +31,7 @@ async fn main(spawner: Spawner) {
 
     let mut ticker = Ticker::every(Duration::from_micros(INTERVAL_US));
 
-    // Wait for USB host to connect
+    // Wait for USB host to open the CDC port before streaming data.
     cdc.wait_connection().await;
 
     loop {
@@ -37,7 +42,6 @@ async fn main(spawner: Spawner) {
         let pitch = pitch_axis.process(&mut adc, &mut pin_pitch);
         let roll = roll_axis.process(&mut adc, &mut pin_roll);
 
-        // Format into buffer and send over USB CDC
         let mut buf: String<64> = String::new();
         let _ = write!(buf, "{}, {}, {}, {}\r\n", throttle, yaw, pitch, roll);
         let _ = cdc.write_packet(buf.as_bytes()).await;

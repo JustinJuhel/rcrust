@@ -33,11 +33,12 @@ impl Axis {
         pin: &mut P,
     ) -> u16 {
         let raw = self.read_oversample(adc, pin);
-        self.exponential_moving_average(raw)
+        // let raw = self.exponential_moving_average(raw);
+        raw
     }
 
     /// # Read with Oversampling
-    /// This function firstly reads the pin once and doesn't take the value into account. This happens because of an ADC crosstalk problem.
+    /// **not anymore**: This function firstly reads the pin once and doesn't take the value into account. This happens because of an ADC crosstalk problem.
     /// The STM32 has only one Analog-to-Digital converter which is shared between all the pins. This can cause the voltage level of one analog input channel to
     /// influence the reading of another.
     ///
@@ -47,8 +48,6 @@ impl Axis {
         adc: &mut Adc<'_, T>,
         pin: &mut P,
     ) -> u16 {
-        let _trash = Self::read(adc, pin);
-
         let basis = 6;
         let sample = 1 << basis;
         let mut summed_raw: u32 = 0;

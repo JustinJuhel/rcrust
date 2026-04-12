@@ -1,13 +1,11 @@
-use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{Adc, SampleTime};
-use embassy_stm32::peripherals::{ADC1, PA1, PA2, PB0, PB1, USB_OTG_FS};
+use embassy_stm32::peripherals::{ADC1, PA0, PA1, PB0, PB1, USB_OTG_FS};
 use embassy_stm32::time::Hertz;
 use embassy_stm32::usb::Driver;
 use embassy_stm32::{Config, bind_interrupts, peripherals};
 use embassy_usb::UsbDevice;
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
-use panic_probe as _;
 use static_cell::StaticCell;
 
 bind_interrupts!(struct Irqs {
@@ -21,17 +19,17 @@ async fn usb_task(mut device: UsbDevice<'static, Driver<'static, peripherals::US
 
 /// # Initialize RC
 /// This function is called at boot and does the following tasks:
-/// - Clock configuration
-/// - USB CDC-ACM setup
-/// - ADC setup
+/// * Clock configuration
+/// * USB CDC-ACM setup
+/// * ADC setup
 ///
 /// And returns the peripherals to be used in the main loop.
 pub fn init_rc(
     spawner: Spawner,
 ) -> (
     Adc<'static, ADC1>,
+    PA0,
     PA1,
-    PA2,
     PB0,
     PB1,
     CdcAcmClass<'static, Driver<'static, USB_OTG_FS>>,
@@ -102,8 +100,9 @@ pub fn init_rc(
 
     // ADC setup
     let mut adc = Adc::new(p.ADC1);
-    adc.set_sample_time(SampleTime::CYCLES480);
+    // adc.set_sample_time(SampleTime::CYCLES480);
+    adc.set_sample_time(SampleTime::CYCLES56);
     adc.set_resolution(embassy_stm32::adc::Resolution::BITS12);
 
-    (adc, p.PA1, p.PA2, p.PB0, p.PB1, cdc)
+    (adc, p.PA0, p.PA1, p.PB0, p.PB1, cdc)
 }
