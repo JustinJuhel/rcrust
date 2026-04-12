@@ -1,12 +1,22 @@
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{Adc, SampleTime};
+use embassy_stm32::gpio::{Level, Output, Speed};
+use embassy_stm32::mode::Blocking;
 use embassy_stm32::peripherals::{ADC1, PA0, PA1, PB0, PB1, USB_OTG_FS};
+use embassy_stm32::spi::{self, Spi};
 use embassy_stm32::time::Hertz;
 use embassy_stm32::usb::Driver;
 use embassy_stm32::{Config, bind_interrupts, peripherals};
 use embassy_usb::UsbDevice;
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use static_cell::StaticCell;
+
+use display_interface_spi::SPIInterface;
+use embedded_graphics::pixelcolor::Rgb565;
+use embedded_graphics::prelude::*;
+use embedded_hal_bus::spi::ExclusiveDevice;
+use mipidsi::models::ILI9341Rgb565;
+use mipidsi::options::{Orientation, Rotation};
 
 bind_interrupts!(struct Irqs {
     OTG_FS => embassy_stm32::usb::InterruptHandler<peripherals::USB_OTG_FS>;
@@ -17,11 +27,29 @@ async fn usb_task(mut device: UsbDevice<'static, Driver<'static, peripherals::US
     device.run().await;
 }
 
+/// # LCD
+/// A high-level handle for the ILI9341 LCD Display.
+///
+/// This type represents a display configured with:
+/// * **Interface:** SPI using a blocking driver.
+/// * **Bus Management:** Exclusive access (the SPI bus is dedicated to this display).
+/// * **Color Protocol:** RGB565 (16-bit color).
+/// * **Controller:** ILI9341.
+pub type Lcd = mipidsi::Display<
+    SPIInterface<
+        ExclusiveDevice<Spi<'static, Blocking>, Output<'static>, embedded_hal_bus::spi::NoDelay>,
+        Output<'static>,
+    >,
+    ILI9341Rgb565,
+    Output<'static>,
+>;
+
 /// # Initialize RC
 /// This function is called at boot and does the following tasks:
 /// * Clock configuration
 /// * USB CDC-ACM setup
 /// * ADC setup
+/// * SPI display setup (ILI9341)
 ///
 /// And returns the peripherals to be used in the main loop.
 pub fn init_rc(
@@ -33,6 +61,7 @@ pub fn init_rc(
     PB0,
     PB1,
     CdcAcmClass<'static, Driver<'static, USB_OTG_FS>>,
+    Lcd,
 ) {
     // Configure clocks: HSE 25 MHz (typical BlackPill) -> PLL -> 84 MHz sys, 48 MHz USB
     let mut config = Config::default();
@@ -100,9 +129,32 @@ pub fn init_rc(
 
     // ADC setup
     let mut adc = Adc::new(p.ADC1);
-    // adc.set_sample_time(SampleTime::CYCLES480);
     adc.set_sample_time(SampleTime::CYCLES56);
     adc.set_resolution(embassy_stm32::adc::Resolution::BITS12);
 
-    (adc, p.PA0, p.PA1, p.PB0, p.PB1, cdc)
+    // SPI2 + ILI9341 display setup
+    let mut spi_config = spi::Config::default();
+    spi_config.frequency = Hertz(10_000_000);
+
+    let spi = Spi::new_blocking_txonly(p.SPI2, p.PB10, p.PB15, spi_config);
+    let cs = Output::new(p.PB12, Level::High, Speed::VeryHigh);
+    let dc = Output::new(p.PB13, Level::Low, Speed::VeryHigh);
+    let mut rst = Output::new(p.PB14, Level::Low, Speed::VeryHigh);
+
+    cortex_m::asm::delay(84_000 * 10);
+    rst.set_high();
+    cortex_m::asm::delay(84_000 * 120);
+
+    let spi_dev = ExclusiveDevice::new_no_delay(spi, cs).unwrap();
+    let di = SPIInterface::new(spi_dev, dc);
+
+    let mut display = mipidsi::Builder::new(ILI9341Rgb565, di)
+        .reset_pin(rst)
+        .orientation(Orientation::new().rotate(Rotation::Deg90))
+        .init(&mut embassy_time::Delay)
+        .unwrap();
+
+    display.clear(Rgb565::BLACK).unwrap();
+
+    (adc, p.PA0, p.PA1, p.PB0, p.PB1, cdc, display)
 }

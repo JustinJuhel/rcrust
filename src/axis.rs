@@ -1,20 +1,13 @@
 use embassy_stm32::adc::{Adc, AdcChannel, Instance};
 
 /// # Axis
-/// This struct is used to read values from pins and store data used by the EMA filter.
-pub struct Axis {
-    last_filtered: Option<f32>,
-    alpha: f32,
-}
+/// This struct is used to read values from pins.
+pub struct Axis {}
 
 impl Axis {
     /// # New
-    /// `Axis` instanciation. The `window` argument affects the EMA filter's sensitivity. The higher `window`, the more "low-pass" the filter.
-    pub fn new(window: f32) -> Self {
-        Self {
-            last_filtered: None,
-            alpha: 2.0 / (window + 1.0),
-        }
+    pub fn new() -> Self {
+        Self {}
     }
 
     /// # Read
@@ -25,15 +18,13 @@ impl Axis {
 
     /// # Process
     /// Processes raw data:
-    /// - oversample by reading several times the same pin, in order to smooth the signal and suppress hardware jitter,
-    /// - apply an exponential moving average filter to smooth the signal.
+    /// * oversample by reading several times the same pin, in order to smooth the signal and suppress hardware jitter,
     pub fn process<T: Instance, P: AdcChannel<T>>(
         &mut self,
         adc: &mut Adc<'_, T>,
         pin: &mut P,
     ) -> u16 {
         let raw = self.read_oversample(adc, pin);
-        // let raw = self.exponential_moving_average(raw);
         raw
     }
 
@@ -57,22 +48,6 @@ impl Axis {
             cnt += 1;
         }
         // bit shift by 6 is much faster than division by 64
-        // summed_raw >> 6
         (summed_raw >> basis) as u16
-    }
-
-    /// # EMA (exponential moving average) filter.
-    /// Computationally cheap. Smoothes out sensor jitter.
-    fn exponential_moving_average(&mut self, raw: u16) -> u16 {
-        let current = raw as f32;
-
-        let filtered = match self.last_filtered {
-            Some(prev) => prev + self.alpha * (current - prev),
-            None => current,
-        };
-
-        self.last_filtered = Some(filtered);
-        // cast back to integer for output
-        filtered as u16
     }
 }
