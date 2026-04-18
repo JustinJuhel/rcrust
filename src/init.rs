@@ -1,6 +1,6 @@
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{Adc, SampleTime};
-use embassy_stm32::gpio::{Level, Output, Speed};
+use embassy_stm32::gpio::{Input, Level, Output, Pull, Speed};
 use embassy_stm32::mode::Blocking;
 use embassy_stm32::peripherals::{ADC1, PA0, PA1, PB0, PB1, USB_OTG_FS};
 use embassy_stm32::spi::{self, Spi};
@@ -17,6 +17,8 @@ use embedded_graphics::prelude::*;
 use embedded_hal_bus::spi::ExclusiveDevice;
 use mipidsi::models::ILI9341Rgb565;
 use mipidsi::options::{Orientation, Rotation};
+
+use crate::display::Screen;
 
 bind_interrupts!(struct Irqs {
     OTG_FS => embassy_stm32::usb::InterruptHandler<peripherals::USB_OTG_FS>;
@@ -61,7 +63,8 @@ pub fn init_rc(
     PB0,
     PB1,
     CdcAcmClass<'static, Driver<'static, USB_OTG_FS>>,
-    Lcd,
+    Screen,
+    Input<'static>,
 ) {
     // Configure clocks: HSE 25 MHz (typical BlackPill) -> PLL -> 84 MHz sys, 48 MHz USB
     let mut config = Config::default();
@@ -110,6 +113,7 @@ pub fn init_rc(
         .unwrap();
 
     display.clear(Rgb565::BLACK).unwrap();
+    let screen = Screen::new(display);
 
     // ADC setup
     let mut adc = Adc::new(p.ADC1);
@@ -158,5 +162,8 @@ pub fn init_rc(
     let usb_device = builder.build();
     spawner.must_spawn(usb_task(usb_device));
 
-    (adc, p.PA0, p.PA1, p.PB0, p.PB1, cdc, display)
+    // ARM/DISARM switch
+    let arm_switch = Input::new(p.PA5, Pull::Up);
+
+    (adc, p.PA0, p.PA1, p.PB0, p.PB1, cdc, screen, arm_switch)
 }

@@ -11,7 +11,6 @@ use panic_rtt_target as _;
 use rtt_target::rtt_init_print;
 
 use read_gpio::axis::Axis;
-use read_gpio::display::draw_axes;
 use read_gpio::init::init_rc;
 
 const INTERVAL_US: u64 = 1000;
@@ -22,8 +21,16 @@ async fn main(spawner: Spawner) {
     // RTT is only used for logs over ST-LINK/SWD.
     rtt_init_print!();
 
-    let (mut adc, mut pin_throttle, mut pin_yaw, mut pin_pitch, mut pin_roll, mut cdc, mut display) =
-        init_rc(spawner);
+    let (
+        mut adc,
+        mut pin_throttle,
+        mut pin_yaw,
+        mut pin_pitch,
+        mut pin_roll,
+        mut cdc,
+        mut screen,
+        arm_switch,
+    ) = init_rc(spawner);
 
     let mut throttle_axis = Axis::new();
     let mut yaw_axis = Axis::new();
@@ -46,7 +53,11 @@ async fn main(spawner: Spawner) {
         display_counter += 1;
         if display_counter >= DISPLAY_INTERVAL {
             display_counter = 0;
-            draw_axes(&mut display, throttle, yaw, pitch, roll);
+            if arm_switch.is_low() {
+                screen.draw_axes(throttle, yaw, pitch, roll);
+            } else {
+                screen.draw_disarmed();
+            }
         }
 
         let mut buf: String<64> = String::new();
