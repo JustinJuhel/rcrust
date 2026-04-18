@@ -25,6 +25,11 @@ pub fn draw_axes(
         .background_color(Rgb565::BLACK)
         .build();
 
+    // Overwrite "DISARMED" with blanks, then show the 4 axes
+    let mut buf: String<32> = String::new();
+    let _ = write!(buf, "{:<14}", "");
+    let _ = Text::with_baseline(&buf, Point::new(20, 80), style, Baseline::Top).draw(display);
+
     let axes: [(&str, u16); 4] = [
         ("Throttle", throttle),
         ("Yaw", yaw),
@@ -38,4 +43,24 @@ pub fn draw_axes(
         let y = 20 + (i as i32) * 40;
         let _ = Text::with_baseline(&buf, Point::new(20, y), style, Baseline::Top).draw(display);
     }
+}
+
+/// # Draw "DISARMED"
+/// Overwrite the previous display with blanks, then show DISARMED
+pub fn draw_disarmed(display: &mut impl DrawTarget<Color = Rgb565>) {
+    let style = MonoTextStyleBuilder::new()
+        .font(&FONT_10X20)
+        .text_color(Rgb565::WHITE)
+        .background_color(Rgb565::BLACK)
+        .build();
+
+    // Overwrite the 4 axes lines with blanks, then show DISARMED
+    for i in 0..4 {
+        let mut buf: String<32> = String::new();
+        let _ = write!(buf, "{:<14}", "");
+        let y = 20 + (i as i32) * 40;
+        let _ = Text::with_baseline(&buf, Point::new(20, y), style, Baseline::Top).draw(display);
+    }
+
+    let _ = Text::with_baseline("DISARMED", Point::new(20, 80), style, Baseline::Top).draw(display);
 }
