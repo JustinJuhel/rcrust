@@ -18,6 +18,8 @@ use embedded_hal_bus::spi::ExclusiveDevice;
 use mipidsi::models::ILI9341Rgb565;
 use mipidsi::options::{Orientation, Rotation};
 
+use crate::display::Screen;
+
 bind_interrupts!(struct Irqs {
     OTG_FS => embassy_stm32::usb::InterruptHandler<peripherals::USB_OTG_FS>;
 });
@@ -61,7 +63,7 @@ pub fn init_rc(
     PB0,
     PB1,
     CdcAcmClass<'static, Driver<'static, USB_OTG_FS>>,
-    Lcd,
+    Screen,
     Input<'static>,
 ) {
     // Configure clocks: HSE 25 MHz (typical BlackPill) -> PLL -> 84 MHz sys, 48 MHz USB
@@ -111,6 +113,7 @@ pub fn init_rc(
         .unwrap();
 
     display.clear(Rgb565::BLACK).unwrap();
+    let screen = Screen::new(display);
 
     // ADC setup
     let mut adc = Adc::new(p.ADC1);
@@ -162,5 +165,5 @@ pub fn init_rc(
     // ARM/DISARM switch
     let arm_switch = Input::new(p.PA5, Pull::Up);
 
-    (adc, p.PA0, p.PA1, p.PB0, p.PB1, cdc, display, arm_switch)
+    (adc, p.PA0, p.PA1, p.PB0, p.PB1, cdc, screen, arm_switch)
 }

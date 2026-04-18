@@ -11,7 +11,6 @@ use panic_rtt_target as _;
 use rtt_target::rtt_init_print;
 
 use read_gpio::axis::Axis;
-use read_gpio::display::{draw_axes, draw_disarmed};
 use read_gpio::init::init_rc;
 
 const INTERVAL_US: u64 = 1000;
@@ -29,7 +28,7 @@ async fn main(spawner: Spawner) {
         mut pin_pitch,
         mut pin_roll,
         mut cdc,
-        mut display,
+        mut screen,
         arm_switch,
     ) = init_rc(spawner);
 
@@ -55,9 +54,9 @@ async fn main(spawner: Spawner) {
         if display_counter >= DISPLAY_INTERVAL {
             display_counter = 0;
             if arm_switch.is_low() {
-                draw_axes(&mut display, throttle, yaw, pitch, roll);
+                screen.draw_axes(throttle, yaw, pitch, roll);
             } else {
-                draw_disarmed(&mut display);
+                screen.draw_disarmed();
             }
         }
 
