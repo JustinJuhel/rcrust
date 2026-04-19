@@ -14,7 +14,6 @@ use read_gpio::axis::Axis;
 use read_gpio::init::init_rc;
 
 const INTERVAL_US: u64 = 1000;
-const DISPLAY_INTERVAL: u16 = 100;
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
@@ -37,27 +36,28 @@ async fn main(spawner: Spawner) {
     let mut pitch_axis = Axis::new();
     let mut roll_axis = Axis::new();
 
+    let mut curr_armed: bool = false;
+
     cdc.wait_connection().await;
 
     let mut ticker = Ticker::every(Duration::from_micros(INTERVAL_US));
-    let mut display_counter: u16 = 0;
 
     loop {
         ticker.next().await;
 
+        // Compute the axes
         let throttle = throttle_axis.process(&mut adc, &mut pin_throttle);
         let yaw = yaw_axis.process(&mut adc, &mut pin_yaw);
         let pitch = pitch_axis.process(&mut adc, &mut pin_pitch);
         let roll = roll_axis.process(&mut adc, &mut pin_roll);
 
-        display_counter += 1;
-        if display_counter >= DISPLAY_INTERVAL {
-            display_counter = 0;
-            if arm_switch.is_low() {
-                screen.draw_axes(throttle, yaw, pitch, roll);
-            } else {
-                screen.draw_disarmed();
-            }
+        // Get the armed/disarmed state
+        let new_armed = arm_switch.is_low();
+        // Arm switch was just toggled
+        if new_armed != curr_armed {
+            // Draw only if the state changed to save computation resource
+            screen.draw_disarmed(new_armed);
+            curr_armed = new_armed;
         }
 
         let mut buf: String<64> = String::new();
